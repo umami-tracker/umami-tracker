@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<meta name="theme-color" content="#1a1a18"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Umami"/>
+<title>Umami Cost Tracker</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --ink:#1a1a18;--paper:#f5f3ee;--gold:#c9a84c;--gold-dim:#8a6d2a;
+  --muted:#6b6860;--line:rgba(26,26,24,0.12);--success:#2d6a4f;
+  --danger:#8b2e2e;--warn:#8b6914;--card:#ffffff;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow:hidden;background:var(--ink)}
+body{font-family:'DM Mono',monospace;color:var(--ink);display:flex;flex-direction:column}
+
+/* App shell */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+
+/* Header */
+.hdr{
+  background:var(--ink);
+  padding:calc(12px + var(--safe-top)) 20px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.hdr-brand{font-family:'Noto Serif JP',serif;font-weight:300;font-size:14px;color:var(--gold);letter-spacing:.18em;text-transform:uppercase}
+.hdr-sub{font-size:9px;color:rgba(201,168,76,.45);letter-spacing:.2em;margin-top:2px}
+.hdr-month{font-size:11px;color:var(--gold);letter-spacing:.1em;text-align:right;cursor:pointer;padding:4px 8px;border:1px solid rgba(201,168,76,.3);border-radius:3px}
+
+/* Tabs */
+.tabs{display:flex;background:var(--ink);border-top:1px solid rgba(201,168,76,.15);flex-shrink:0}
+.tab{flex:1;padding:11px 4px;text-align:center;font-size:9px;letter-spacing:.14em;color:#55534e;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;text-transform:uppercase;background:none;border-left:none;border-right:none;border-top:none;font-family:'DM Mono',monospace}
+.tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* Scroll area */
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--paper)}
+.panel{display:none;padding:16px 16px calc(16px + var(--safe-bot));min-height:100%}
+.panel.on{display:block}
+
+/* Section label */
+.slabel{font-size:9px;letter-spacing:.25em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.slabel::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* Upload zone */
+.upzone{border:1.5px dashed rgba(201,168,76,.35);border-radius:6px;padding:28px 16px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(201,168,76,.02);position:relative}
+.upzone.drag{border-color:var(--gold);background:rgba(201,168,76,.06)}
+.upzone-icon{font-size:26px;margin-bottom:8px;opacity:.55}
+.upzone-title{font-family:'Noto Serif JP',serif;font-size:15px;color:var(--ink);margin-bottom:4px}
+.upzone-hint{font-size:10px;color:var(--muted);letter-spacing:.06em}
+#preview{max-width:100%;max-height:180px;border-radius:4px;margin-top:10px;display:none;object-fit:contain}
+#file-in{display:none}
+.conv-badge{display:none;font-size:10px;color:var(--gold-dim);letter-spacing:.1em;margin-top:8px;text-align:center}
+.conv-badge.on{display:block}
+
+/* Category selector */
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.cat-btn{padding:10px 4px;text-align:center;font-size:9px;letter-spacing:.1em;border:1px solid var(--line);border-radius:4px;cursor:pointer;background:var(--card);color:var(--muted);text-transform:uppercase;font-family:'DM Mono',monospace;transition:all .2s}
+.cat-btn.sel{background:var(--ink);color:var(--gold);border-color:var(--gold-dim)}
+
+/* Buttons */
+.btn{width:100%;padding:13px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;border-radius:4px;transition:all .2s;margin-top:12px;border:none}
+.btn-primary{background:var(--ink);color:var(--gold);border:1px solid var(--gold-dim)}
+.btn-primary:active{background:#2d2d2a}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--ink);border:1px solid var(--line);margin-top:8px}
+.btn-outline:active{background:var(--line)}
+.btn-success{background:var(--success);color:#fff;border:none}
+
+/* Loading */
+.lbar{display:none;margin-top:12px}
+.lbar.on{display:block}
+.ltrack{height:2px;background:var(--line);border-radius:1px;overflow:hidden}
+.lfill{height:100%;background:var(--gold);width:0%;transition:width .3s ease}
+.ltext{font-size:9px;color:var(--muted);letter-spacing:.15em;margin-top:5px;text-align:center}
+
+/* Result card */
+.rcard{background:var(--card);border:1px solid var(--line);border-radius:6px;margin-top:14px;overflow:hidden;display:none}
+.rcard.on{display:block}
+.rcard-hdr{padding:10px 14px;background:var(--ink);display:flex;justify-content:space-between;align-items:center}
+.rcard-title{font-size:9px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase}
+.rbody{padding:12px 14px}
+.item-row{display:grid;grid-template-columns:1fr auto auto;gap:6px;padding:7px 0;border-bottom:1px solid var(--line);align-items:center;font-size:11px}
+.item-row:last-child{border-bottom:none}
+.i-name{color:var(--ink);font-size:10px}
+.i-qty{color:var(--muted);font-size:9px}
+.i-price{color:var(--ink);font-weight:500;text-align:right;font-size:11px}
+.total-row{display:flex;justify-content:space-between;padding:10px 14px;background:rgba(201,168,76,.05);border-top:1px solid rgba(201,168,76,.2);font-size:12px}
+.total-lbl{font-family:'Noto Serif JP',serif;color:var(--muted);letter-spacing:.1em}
+.total-amt{color:var(--gold-dim);font-weight:500}
+.act-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+.act-row .btn{margin-top:0}
+
+/* Edit fields */
+.fgroup{margin-bottom:10px}
+.flabel{font-size:9px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.field{width:100%;background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:9px 10px;font-family:'DM Mono',monospace;font-size:12px;color:var(--ink)}
+.field:focus{outline:none;border-color:var(--gold-dim)}
+select.field{appearance:none;-webkit-appearance:none}
+
+/* Error */
+.err{font-size:10px;color:var(--danger);margin-top:6px;text-align:center;display:none}
+.err.on{display:block}
+
+/* Sales input */
+.sales-card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:12px}
+.sales-title{font-family:'Noto Serif JP',serif;font-size:13px;color:var(--ink);margin-bottom:12px}
+
+/* Records */
+.rec-item{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:8px}
+.rec-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+.rec-supplier{font-family:'Noto Serif JP',serif;font-size:13px;color:var(--ink)}
+.rec-total{font-size:14px;font-weight:500;color:var(--gold-dim)}
+.rec-meta{font-size:9px;color:var(--muted);display:flex;gap:10px}
+.cat-tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.tag-meat{background:rgba(139,46,46,.1);color:var(--danger)}
+.tag-seafood{background:rgba(45,106,79,.1);color:var(--success)}
+.tag-japanese{background:rgba(201,168,76,.15);color:var(--gold-dim)}
+.tag-vegetable{background:rgba(45,150,79,.1);color:#2d7a4f}
+.tag-others{background:rgba(107,104,96,.1);color:var(--muted)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.stat-card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px}
+.stat-label{font-size:8px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+.stat-value{font-family:'Noto Serif JP',serif;font-size:22px;font-weight:300;color:var(--ink)}
+.stat-sub{font-size:9px;color:var(--muted);margin-top:2px}
+
+/* Food cost breakdown */
+.fc-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.fc-row:last-child{border-bottom:none;font-weight:500}
+.fc-name{font-size:11px;color:var(--ink)}
+.fc-bar-wrap{flex:1;margin:0 10px;height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.fc-bar{height:100%;border-radius:2px;transition:width .8s ease}
+.fc-pct{font-size:11px;font-weight:500;min-width:42px;text-align:right}
+.pct-good{color:var(--success)}
+.pct-warn{color:var(--warn)}
+.pct-bad{color:var(--danger)}
+
+/* Month badge */
+.month-pill{display:inline-block;font-size:9px;letter-spacing:.12em;padding:3px 10px;border:1px solid rgba(201,168,76,.3);border-radius:20px;color:var(--gold);text-align:center;margin-bottom:12px}
+
+/* Empty */
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:28px;opacity:.3;margin-bottom:10px}
+.empty-text{font-size:10px;letter-spacing:.1em}
+
+/* Toast */
+#toast{position:fixed;bottom:calc(20px + var(--safe-bot));left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--gold);font-size:11px;letter-spacing:.1em;padding:10px 20px;border-radius:20px;border:1px solid var(--gold-dim);opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:12px;height:12px;border:1.5px solid rgba(201,168,76,.3);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <div>
+      <div class="hdr-brand">Decade of Umami</div>
+      <div class="hdr-sub">Food Cost Tracker</div>
+    </div>
+    <div class="hdr-month" id="month-display" onclick="changeMonth()">04/2026</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="switchTab('scan',this)">Scan</button>
+    <button class="tab" onclick="switchTab('sales',this)">Sales</button>
+    <button class="tab" onclick="switchTab('records',this)">Records</button>
+    <button class="tab" onclick="switchTab('analysis',this)">Analysis</button>
+  </div>
+
+  <div class="scroll">
+
+    <!-- SCAN -->
+    <div class="panel on" id="panel-scan">
+      <div class="slabel">Upload Invoice</div>
+      <div class="upzone" id="upzone" onclick="document.getElementById('file-in').click()"
+        ondragover="onDrag(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <div class="upzone-icon">📄</div>
+        <div class="upzone-title">Tap to upload invoice</div>
+        <div class="upzone-hint">HEIC · JPG · PNG · PDF</div>
+        <img id="preview" src="" alt=""/>
+      </div>
+      <div class="conv-badge" id="conv-badge"><span class="spinner"></span>Converting HEIC...</div>
+      <input type="file" id="file-in" accept="image/*,.heic,.heif,.pdf" onchange="onFile(event)"/>
+      <div class="err" id="err-msg"></div>
+      <button class="btn btn-primary" id="scan-btn" onclick="doScan()" disabled>▶ Scan with Claude AI</button>
+
+      <div class="lbar" id="lbar">
+        <div class="ltrack"><div class="lfill" id="lfill"></div></div>
+        <div class="ltext" id="ltext">Initializing...</div>
+      </div>
+
+      <!-- Result -->
+      <div class="rcard" id="rcard">
+        <div class="rcard-hdr"><span class="rcard-title">Extracted Data</span></div>
+        <div class="rbody">
+          <div class="fgroup">
+            <div class="flabel">Supplier</div>
+            <input class="field" id="f-supplier" placeholder="Supplier name"/>
+          </div>
+          <div class="fgroup">
+            <div class="flabel">Date</div>
+            <input class="field" id="f-date" type="date"/>
+          </div>
+          <div class="fgroup">
+            <div class="flabel">Category</div>
+            <div class="cat-grid">
+              <button class="cat-btn" onclick="selCat('Meat',this)">🥩 Meat</button>
+              <button class="cat-btn" onclick="selCat('Seafood',this)">🐟 Seafood</button>
+              <button class="cat-btn" onclick="selCat('Japanese Food',this)">🍱 Japanese</button>
+              <button class="cat-btn" onclick="selCat('Vegetable',this)">🥦 Vegetable</button>
+              <button class="cat-btn" onclick="selCat('Others',this)">📦 Others</button>
+            </div>
+          </div>
+          <div class="flabel">Items</div>
+          <div id="items-list"></div>
+        </div>
+        <div class="total-row">
+          <span class="total-lbl">Total (inc GST)</span>
+          <span class="total-amt" id="f-total">AU $0.00</span>
+        </div>
+        <div class="act-row">
+          <button class="btn btn-outline" onclick="clearScan()">Clear</button>
+          <button class="btn btn-primary" id="save-btn" onclick="saveInvoice()">Save → Sheets</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALES -->
+    <div class="panel" id="panel-sales">
+      <div class="month-pill" id="sales-month-pill">04/2026</div>
+      <div class="slabel">Monthly Sales</div>
+      <div class="sales-card">
+        <div class="sales-title">Enter sales figures for this month</div>
+        <div class="fgroup">
+          <div class="flabel">Sales Before Tax (AUD)</div>
+          <input class="field" id="s-before" type="number" placeholder="e.g. 127096.51" inputmode="decimal"/>
+        </div>
+        <div class="fgroup">
+          <div class="flabel">Sales After Tax (AUD)</div>
+          <input class="field" id="s-after" type="number" placeholder="e.g. 115542.28" inputmode="decimal"/>
+        </div>
+        <button class="btn btn-primary" onclick="saveSales()">Save Sales → Sheets</button>
+        <div class="err" id="sales-err"></div>
+      </div>
+      <div class="sales-card" style="background:rgba(201,168,76,0.04);border-color:rgba(201,168,76,0.2)">
+        <div class="flabel" style="margin-bottom:8px">Target</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8">
+          Food Cost % below <span style="color:var(--success);font-weight:500">30%</span> = On track<br/>
+          Food Cost % <span style="color:var(--warn);font-weight:500">30–35%</span> = Watch closely<br/>
+          Food Cost % above <span style="color:var(--danger);font-weight:500">35%</span> = Review suppliers
+        </div>
+      </div>
+    </div>
+
+    <!-- RECORDS -->
+    <div class="panel" id="panel-records">
+      <div class="month-pill" id="rec-month-pill">04/2026</div>
+      <div class="slabel">Invoice History</div>
+      <div id="records-list">
+        <div class="empty"><div class="empty-icon">◈</div><div class="empty-text">No invoices this month</div></div>
+      </div>
+    </div>
+
+    <!-- ANALYSIS -->
+    <div class="panel" id="panel-analysis">
+      <div class="month-pill" id="ana-month-pill">04/2026</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Spend</div>
+          <div class="stat-value" id="st-spend">$0</div>
+          <div class="stat-sub">ex GST</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Food Cost %</div>
+          <div class="stat-value" id="st-pct">—</div>
+          <div class="stat-sub">after tax</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Invoices</div>
+          <div class="stat-value" id="st-count">0</div>
+          <div class="stat-sub">This month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Top Cost</div>
+          <div class="stat-value" style="font-size:14px" id="st-top">—</div>
+          <div class="stat-sub">Category</div>
+        </div>
+      </div>
+      <div class="slabel">By Category</div>
+      <div class="sales-card" id="cat-breakdown">
+        <div class="empty"><div class="empty-icon">◈</div><div class="empty-text">Scan invoices to see breakdown</div></div>
+      </div>
+    </div>
+
+  </div><!-- /scroll -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzYYMEn0-HJHUzLtzYq4GT__Qg2A7CaSTcIFDxkIHvZzDoZOm814PGuvgjEFsK6W2GS/exec';
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let currentMonth = getCurrentMonth();
+let currentFile = null;
+let currentData = null;
+let selectedCat = '';
+let records = [];
+
+// ─── MONTH ─────────────────────────────────────────────────────────────────
+function getCurrentMonth() {
+  const d = new Date();
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function updateMonthDisplays() {
+  ['month-display','sales-month-pill','rec-month-pill','ana-month-pill'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = currentMonth;
+  });
+}
+
+function changeMonth() {
+  const parts = currentMonth.split('/');
+  const val = `${parts[1]}-${parts[0]}`;
+  const input = prompt('Enter month (MM/YYYY):', currentMonth);
+  if(input && /^\d{2}\/\d{4}$/.test(input)) {
+    currentMonth = input;
+    updateMonthDisplays();
+    loadRecords();
+  }
+}
+
+// ─── TABS ──────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('panel-' + name).classList.add('on');
+  if(name === 'records') renderRecords();
+  if(name === 'analysis') renderAnalysis();
+}
+
+// ─── FILE HANDLING ─────────────────────────────────────────────────────────
+function onDrag(e) { e.preventDefault(); document.getElementById('upzone').classList.add('drag'); }
+function onDragLeave() { document.getElementById('upzone').classList.remove('drag'); }
+function onDrop(e) { e.preventDefault(); document.getElementById('upzone').classList.remove('drag'); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }
+function onFile(e) { if(e.target.files[0]) processFile(e.target.files[0]); }
+
+async function processFile(file) {
+  currentFile = null;
+  document.getElementById('scan-btn').disabled = true;
+  document.getElementById('err-msg').classList.remove('on');
+  document.getElementById('conv-badge').classList.remove('on');
+  const name = file.name.toLowerCase();
+  const isHeic = name.endsWith('.heic') || name.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif';
+  if(isHeic) {
+    document.getElementById('conv-badge').classList.add('on');
+    try {
+      let blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+      if(Array.isArray(blob)) blob = blob[0];
+      document.getElementById('conv-badge').classList.remove('on');
+      showPreview(URL.createObjectURL(blob));
+      currentFile = { converted: true, blob, type: 'image/jpeg' };
+      document.getElementById('scan-btn').disabled = false;
+    } catch(err) {
+      document.getElementById('conv-badge').classList.remove('on');
+      showErr('HEIC convert failed: ' + err.message);
+    }
+  } else {
+    currentFile = file;
+    if(file.type.startsWith('image/')) {
+      const r = new FileReader();
+      r.onload = e => showPreview(e.target.result);
+      r.readAsDataURL(file);
+    } else {
+      document.getElementById('preview').style.display = 'none';
+    }
+    document.getElementById('scan-btn').disabled = false;
+  }
+}
+
+function showPreview(src) {
+  const img = document.getElementById('preview');
+  img.src = src; img.style.display = 'block';
+}
+
+// ─── SCAN ──────────────────────────────────────────────────────────────────
+async function doScan() {
+  if(!currentFile) return;
+  const btn = document.getElementById('scan-btn');
+  btn.disabled = true;
+  document.getElementById('err-msg').classList.remove('on');
+  setLoading(true, 10, 'Reading invoice...');
+  try {
+    let base64, mediaType;
+    if(currentFile.converted) {
+      base64 = await blobToBase64(currentFile.blob);
+      mediaType = 'image/jpeg';
+    } else {
+      base64 = await fileToBase64(currentFile);
+      mediaType = currentFile.type.startsWith('image/') ? currentFile.type : 'application/pdf';
+    }
+    setLoading(true, 40, 'Sending to Claude AI...');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 1000,
+        system: `You are an invoice parser for a Japanese restaurant kitchen in Sydney. Extract data and return ONLY valid JSON, no markdown, no backticks. Use: {"supplier":"string","date":"YYYY-MM-DD","items":[{"name":"string","qty":"string","unit_price":number,"total":number}],"grand_total":number}. All prices in AUD numbers only. Date format YYYY-MM-DD.`,
+        messages: [{ role: 'user', content: [
+          { type: mediaType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: 'Extract invoice data. JSON only.' }
+        ]}]
+      })
+    });
+    setLoading(true, 80, 'Processing...');
+    if(!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const text = data.content.map(c => c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(text);
+    setLoading(true, 100, 'Done ✓');
+    setTimeout(() => { setLoading(false); showResult(parsed); }, 400);
+  } catch(err) {
+    setLoading(false);
+    btn.disabled = false;
+    showErr('Error: ' + err.message);
+  }
+}
+
+function setLoading(on, pct, txt) {
+  const bar = document.getElementById('lbar');
+  bar.classList.toggle('on', on);
+  if(on) {
+    document.getElementById('lfill').style.width = pct + '%';
+    document.getElementById('ltext').textContent = txt;
+  }
+}
+
+function showResult(data) {
+  currentData = data;
+  document.getElementById('f-supplier').value = data.supplier || '';
+  document.getElementById('f-date').value = data.date || new Date().toISOString().split('T')[0];
+  document.getElementById('f-total').textContent = 'AU $' + (data.grand_total||0).toFixed(2);
+  const list = document.getElementById('items-list');
+  list.innerHTML = (data.items||[]).map(it =>
+    `<div class="item-row"><span class="i-name">${it.name}</span><span class="i-qty">${it.qty||''}</span><span class="i-price">$${(it.total||0).toFixed(2)}</span></div>`
+  ).join('');
+  // Auto-detect category from supplier
+  autoDetectCat(data.supplier || '');
+  document.getElementById('rcard').classList.add('on');
+}
+
+function autoDetectCat(supplier) {
+  const s = supplier.toLowerCase();
+  let cat = 'Others';
+  if(/fish|seafood|uni|ocean|prawn|lobster/.test(s)) cat = 'Seafood';
+  else if(/meat|wagyu|beef|pork|lamb|chicken|cow|meatsmith|waimea/.test(s)) cat = 'Meat';
+  else if(/jfc|jin|daiwa|zero|japanese|japan|nippon/.test(s)) cat = 'Japanese Food';
+  else if(/veg|farm|fresh|produce|garden|waverley/.test(s)) cat = 'Vegetable';
+  selCat(cat, null);
+}
+
+function selCat(cat, btn) {
+  selectedCat = cat;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('sel'));
+  if(btn) { btn.classList.add('sel'); return; }
+  // Find button by text
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    if(b.textContent.includes(cat)) b.classList.add('sel');
+  });
+}
+
+// ─── SAVE INVOICE ──────────────────────────────────────────────────────────
+async function saveInvoice() {
+  if(!currentData) return;
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Saving...';
+  const record = {
+    type: 'invoice',
+    month: currentMonth,
+    date: document.getElementById('f-date').value || currentData.date,
+    supplier: document.getElementById('f-supplier').value || currentData.supplier || 'Unknown',
+    category: selectedCat || 'Others',
+    items: (currentData.items||[]).map(i => i.name).join(', '),
+    total: currentData.grand_total || 0
+  };
+  // Save local
+  const local = { ...record, id: Date.now(), savedAt: new Date().toISOString() };
+  records.push(local);
+  saveLocal();
+  // Push to Sheets
+  try {
+    await pushToSheets(record);
+    toast('✓ Saved to Google Sheets');
+  } catch(e) {
+    toast('✓ Saved locally (Sheets offline)');
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Save → Sheets';
+  clearScan();
+}
+
+async function pushToSheets(data) {
+  const res = await fetch(SHEET_URL, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    headers: { 'Content-Type': 'text/plain' } // avoid CORS preflight
+  });
+  return res.json();
+}
+
+// ─── SAVE SALES ────────────────────────────────────────────────────────────
+async function saveSales() {
+  const before = parseFloat(document.getElementById('s-before').value);
+  const after = parseFloat(document.getElementById('s-after').value);
+  if(!before || !after) { document.getElementById('sales-err').textContent = 'Please enter both values'; document.getElementById('sales-err').classList.add('on'); return; }
+  document.getElementById('sales-err').classList.remove('on');
+  // Save local
+  const salesKey = 'sales_' + currentMonth.replace('/','_');
+  localStorage.setItem(salesKey, JSON.stringify({ before, after, month: currentMonth }));
+  // Push to Sheets
+  try {
+    await pushToSheets({ type: 'sales', month: currentMonth, salesBefore: before, salesAfter: after });
+    toast('✓ Sales saved to Google Sheets');
+  } catch(e) {
+    toast('✓ Sales saved locally');
+  }
+}
+
+// ─── RECORDS ───────────────────────────────────────────────────────────────
+function loadRecords() {
+  try {
+    const key = 'records_' + currentMonth.replace('/','_');
+    records = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch(e) { records = []; }
+}
+
+function saveLocal() {
+  const key = 'records_' + currentMonth.replace('/','_');
+  localStorage.setItem(key, JSON.stringify(records));
+}
+
+function renderRecords() {
+  loadRecords();
+  const el = document.getElementById('records-list');
+  if(!records.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">◈</div><div class="empty-text">No invoices this month</div></div>`; return; }
+  const tagMap = { Meat:'tag-meat', Seafood:'tag-seafood', 'Japanese Food':'tag-japanese', Vegetable:'tag-vegetable', Others:'tag-others' };
+  el.innerHTML = [...records].reverse().map(r => `
+    <div class="rec-item">
+      <div class="rec-top">
+        <span class="rec-supplier">${r.supplier||'Unknown'}</span>
+        <span class="rec-total">AU $${(r.total||0).toFixed(2)}</span>
+      </div>
+      <div class="rec-meta"><span>${r.date||'—'}</span></div>
+      <span class="cat-tag ${tagMap[r.category]||'tag-others'}">${r.category||'Others'}</span>
+    </div>`).join('');
+}
+
+// ─── ANALYSIS ──────────────────────────────────────────────────────────────
+function renderAnalysis() {
+  loadRecords();
+  const salesKey = 'sales_' + currentMonth.replace('/','_');
+  const sales = JSON.parse(localStorage.getItem(salesKey) || 'null');
+  const totalSpend = records.reduce((s,r) => s + (r.total||0), 0);
+  const totalExGST = Math.round(totalSpend / 1.1 * 100) / 100;
+  document.getElementById('st-spend').textContent = '$' + totalExGST.toFixed(0);
+  document.getElementById('st-count').textContent = records.length;
+  // Food cost %
+  if(sales && sales.after > 0) {
+    const pct = (totalExGST / sales.after * 100).toFixed(1);
+    const el = document.getElementById('st-pct');
+    el.textContent = pct + '%';
+    el.className = 'stat-value ' + (pct < 30 ? 'pct-good' : pct < 35 ? 'pct-warn' : 'pct-bad');
+  } else {
+    document.getElementById('st-pct').textContent = '—';
+  }
+  // By category
+  const cats = { Meat:0, Seafood:0, 'Japanese Food':0, Vegetable:0, Others:0 };
+  records.forEach(r => { const c = r.category||'Others'; cats[c] = (cats[c]||0) + (r.total||0)/1.1; });
+  const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('st-top').textContent = topCat && topCat[1] > 0 ? topCat[0].split(' ')[0] : '—';
+  const maxVal = Math.max(...Object.values(cats), 1);
+  const salesAfter = sales?.after || 1;
+  const bd = document.getElementById('cat-breakdown');
+  if(!records.length) { bd.innerHTML = `<div class="empty"><div class="empty-icon">◈</div><div class="empty-text">Scan invoices to see breakdown</div></div>`; return; }
+  bd.innerHTML = Object.entries(cats).map(([cat, val]) => {
+    const pct = salesAfter > 0 ? (val / salesAfter * 100) : 0;
+    const barW = (val / maxVal * 100).toFixed(0);
+    const cls = pct < 10 ? 'pct-good' : pct < 20 ? 'pct-warn' : 'pct-bad';
+    const barColor = pct < 10 ? '#2d6a4f' : pct < 20 ? '#c9a84c' : '#8b2e2e';
+    return `<div class="fc-row">
+      <span class="fc-name">${cat}</span>
+      <div class="fc-bar-wrap"><div class="fc-bar" style="width:${barW}%;background:${barColor}"></div></div>
+      <span class="fc-pct ${cls}">${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('') + `<div class="fc-row" style="margin-top:4px">
+    <span class="fc-name" style="font-weight:500">Total</span>
+    <div class="fc-bar-wrap"></div>
+    <span class="fc-pct ${salesAfter > 1 ? (totalExGST/salesAfter < 0.3 ? 'pct-good' : totalExGST/salesAfter < 0.35 ? 'pct-warn' : 'pct-bad') : ''}" style="font-weight:500">${salesAfter > 1 ? (totalExGST/salesAfter*100).toFixed(1)+'%' : '—'}</span>
+  </div>`;
+}
+
+// ─── UTILS ─────────────────────────────────────────────────────────────────
+function clearScan() {
+  currentFile = null; currentData = null; selectedCat = '';
+  document.getElementById('preview').style.display = 'none';
+  document.getElementById('file-in').value = '';
+  document.getElementById('scan-btn').disabled = true;
+  document.getElementById('rcard').classList.remove('on');
+  document.getElementById('err-msg').classList.remove('on');
+  document.getElementById('conv-badge').classList.remove('on');
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('sel'));
+}
+
+function showErr(msg) { const el = document.getElementById('err-msg'); el.textContent = msg; el.classList.add('on'); }
+
+function fileToBase64(file) {
+  return new Promise((res,rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = () => rej(new Error('Read failed')); r.readAsDataURL(file); });
+}
+function blobToBase64(blob) {
+  return new Promise((res,rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = () => rej(new Error('Read failed')); r.readAsDataURL(blob); });
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ─── SERVICE WORKER ────────────────────────────────────────────────────────
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
+updateMonthDisplays();
+loadRecords();
+</script>
+</body>
+</html>
