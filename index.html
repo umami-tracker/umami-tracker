@@ -308,20 +308,20 @@ select.field{appearance:none;-webkit-appearance:none}
 
     <!-- SETTINGS -->
     <div class="panel" id="panel-settings">
-      <div class="slabel">Gemini API Key</div>
+      <div class="slabel">OpenAI API Key</div>
       <div class="sales-card">
-        <div class="sales-title">Enter your Google Gemini API Key</div>
+        <div class="sales-title">Enter your OpenAI API Key</div>
         <div class="fgroup">
           <div class="flabel">API Key</div>
-          <input class="field" id="api-key-input" type="password" placeholder="AIzaSy..." autocomplete="off"/>
+          <input class="field" id="api-key-input" type="password" placeholder="sk-proj-..." autocomplete="off"/>
         </div>
         <button class="btn btn-primary" onclick="saveApiKey()">Save API Key</button>
         <div class="err" id="settings-err"></div>
         <div style="margin-top:16px;font-size:10px;color:var(--muted);line-height:2">
-          รับ API Key ฟรีที่<br/>
-          <span style="color:var(--gold);font-size:11px">aistudio.google.com/apikey</span><br/>
-          → Create API Key → Copy<br/><br/>
-          ฟรี 1,500 requests/วัน<br/>
+          รับ API Key ที่<br/>
+          <span style="color:var(--gold);font-size:11px">platform.openai.com/api-keys</span><br/>
+          → Create new secret key → Copy<br/><br/>
+          gpt-4o-mini ราคาถูกมาก ~$0.01/วัน<br/>
           Key เก็บใน device นี้เท่านั้น
         </div>
       </div>
@@ -341,8 +341,8 @@ select.field{appearance:none;-webkit-appearance:none}
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzYYMEn0-HJHUzLtzYq4GT__Qg2A7CaSTcIFDxkIHvZzDoZOm814PGuvgjEFsK6W2GS/exec';
-const GEMINI_MODEL = 'gemini-1.5-flash-latest';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
+const OPENAI_MODEL = 'gpt-4o-mini';
+const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 let API_KEY = localStorage.getItem('umami_api_key') || '';
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
@@ -462,21 +462,25 @@ async function doScan() {
       mediaType = currentFile.type.startsWith('image/') ? currentFile.type : 'application/pdf';
     }
     setLoading(true, 40, 'Sending to Claude AI...');
-    const res = await fetch(GEMINI_URL + '?key=' + API_KEY, {
+    const res = await fetch(OPENAI_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
       body: JSON.stringify({
-        contents: [{ parts: [
-          { inline_data: { mime_type: mediaType, data: base64 } },
-          { text: 'You are an invoice parser for a Japanese restaurant in Sydney. Extract invoice data and return ONLY valid JSON, no markdown, no backticks. Use exactly: {"supplier":"string","date":"YYYY-MM-DD","items":[{"name":"string","qty":"string","unit_price":number,"total":number}],"grand_total":number}. All prices AUD numbers only.' }
-        ]}],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+        model: OPENAI_MODEL,
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
+            { type: 'text', text: 'You are an invoice parser for a Japanese restaurant in Sydney. Extract invoice data and return ONLY valid JSON, no markdown, no backticks. Use exactly: {"supplier":"string","date":"YYYY-MM-DD","items":[{"name":"string","qty":"string","unit_price":number,"total":number}],"grand_total":number}. All prices AUD numbers only.' }
+          ]
+        }]
       })
     });
     setLoading(true, 80, 'Processing...');
     if(!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'API ' + res.status); }
     const data = await res.json();
-    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim().replace(/```json|```/g,'').trim();
+    const text = (data.choices?.[0]?.message?.content || '').trim().replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(text);
     setLoading(true, 100, 'Done ✓');
     setTimeout(() => { setLoading(false); showResult(parsed); }, 400);
@@ -694,9 +698,9 @@ function toast(msg) {
 // ─── API KEY ───────────────────────────────────────────────────────────────
 function saveApiKey() {
   const key = document.getElementById('api-key-input').value.trim();
-  if(!key.startsWith('AIza') && key.length < 20) {
+  if(!key.startsWith('sk-') || key.length < 20) {
     const err = document.getElementById('settings-err');
-    err.textContent = 'Invalid key — Gemini keys start with AIza';
+    err.textContent = 'Invalid key — OpenAI keys start with sk-';
     err.classList.add('on');
     return;
   }
