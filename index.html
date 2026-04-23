@@ -306,6 +306,32 @@ select.field{appearance:none;-webkit-appearance:none}
       </div>
     </div>
 
+    <!-- SETTINGS -->
+    <div class="panel" id="panel-settings">
+      <div class="slabel">Gemini API Key</div>
+      <div class="sales-card">
+        <div class="sales-title">Enter your Google Gemini API Key</div>
+        <div class="fgroup">
+          <div class="flabel">API Key</div>
+          <input class="field" id="api-key-input" type="password" placeholder="AIzaSy..." autocomplete="off"/>
+        </div>
+        <button class="btn btn-primary" onclick="saveApiKey()">Save API Key</button>
+        <div class="err" id="settings-err"></div>
+        <div style="margin-top:16px;font-size:10px;color:var(--muted);line-height:2">
+          รับ API Key ฟรีที่<br/>
+          <span style="color:var(--gold);font-size:11px">aistudio.google.com/apikey</span><br/>
+          → Create API Key → Copy<br/><br/>
+          ฟรี 1,500 requests/วัน<br/>
+          Key เก็บใน device นี้เท่านั้น
+        </div>
+      </div>
+      <div class="sales-card" id="key-status" style="display:none;background:rgba(45,106,79,0.05);border-color:rgba(45,106,79,0.3)">
+        <div style="font-size:11px;color:var(--success)">✓ API Key บันทึกแล้ว</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px" id="key-preview"></div>
+        <button class="btn btn-outline" style="margin-top:12px" onclick="clearApiKey()">Remove Key</button>
+      </div>
+    </div>
+
   </div><!-- /scroll -->
 </div><!-- /app -->
 
