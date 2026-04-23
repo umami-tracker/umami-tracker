@@ -178,6 +178,7 @@ select.field{appearance:none;-webkit-appearance:none}
     <button class="tab" onclick="switchTab('sales',this)">Sales</button>
     <button class="tab" onclick="switchTab('records',this)">Records</button>
     <button class="tab" onclick="switchTab('analysis',this)">Analysis</button>
+    <button class="tab" onclick="switchTab('settings',this)">⚙️</button>
   </div>
 
   <div class="scroll">
@@ -314,7 +315,9 @@ select.field{appearance:none;-webkit-appearance:none}
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzYYMEn0-HJHUzLtzYq4GT__Qg2A7CaSTcIFDxkIHvZzDoZOm814PGuvgjEFsK6W2GS/exec';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
+let API_KEY = localStorage.getItem('umami_api_key') || '';
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let currentMonth = getCurrentMonth();
@@ -418,6 +421,8 @@ function showPreview(src) {
 async function doScan() {
   if(!currentFile) return;
   const btn = document.getElementById('scan-btn');
+  API_KEY = localStorage.getItem('umami_api_key') || '';
+  if(!API_KEY) { showErr('Please set your Claude API key in Settings ⚙️'); return; }
   btn.disabled = true;
   document.getElementById('err-msg').classList.remove('on');
   setLoading(true, 10, 'Reading invoice...');
@@ -431,23 +436,21 @@ async function doScan() {
       mediaType = currentFile.type.startsWith('image/') ? currentFile.type : 'application/pdf';
     }
     setLoading(true, 40, 'Sending to Claude AI...');
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(GEMINI_URL + '?key=' + API_KEY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 1000,
-        system: `You are an invoice parser for a Japanese restaurant kitchen in Sydney. Extract data and return ONLY valid JSON, no markdown, no backticks. Use: {"supplier":"string","date":"YYYY-MM-DD","items":[{"name":"string","qty":"string","unit_price":number,"total":number}],"grand_total":number}. All prices in AUD numbers only. Date format YYYY-MM-DD.`,
-        messages: [{ role: 'user', content: [
-          { type: mediaType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-          { type: 'text', text: 'Extract invoice data. JSON only.' }
-        ]}]
+        contents: [{ parts: [
+          { inline_data: { mime_type: mediaType, data: base64 } },
+          { text: 'You are an invoice parser for a Japanese restaurant in Sydney. Extract invoice data and return ONLY valid JSON, no markdown, no backticks. Use exactly: {"supplier":"string","date":"YYYY-MM-DD","items":[{"name":"string","qty":"string","unit_price":number,"total":number}],"grand_total":number}. All prices AUD numbers only.' }
+        ]}],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
       })
     });
     setLoading(true, 80, 'Processing...');
-    if(!res.ok) throw new Error('API ' + res.status);
+    if(!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'API ' + res.status); }
     const data = await res.json();
-    const text = data.content.map(c => c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim().replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(text);
     setLoading(true, 100, 'Done ✓');
     setTimeout(() => { setLoading(false); showResult(parsed); }, 400);
@@ -662,6 +665,40 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+// ─── API KEY ───────────────────────────────────────────────────────────────
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if(!key.startsWith('AIza') && key.length < 20) {
+    const err = document.getElementById('settings-err');
+    err.textContent = 'Invalid key — Gemini keys start with AIza';
+    err.classList.add('on');
+    return;
+  }
+  localStorage.setItem('umami_api_key', key);
+  API_KEY = key;
+  document.getElementById('settings-err').classList.remove('on');
+  document.getElementById('api-key-input').value = '';
+  showKeyStatus();
+  toast('✓ API Key saved');
+}
+
+function clearApiKey() {
+  localStorage.removeItem('umami_api_key');
+  API_KEY = '';
+  document.getElementById('key-status').style.display = 'none';
+  toast('API Key removed');
+}
+
+function showKeyStatus() {
+  const key = localStorage.getItem('umami_api_key') || '';
+  if(key) {
+    document.getElementById('key-status').style.display = 'block';
+    document.getElementById('key-preview').textContent = key.slice(0,12) + '...' + key.slice(-4);
+  } else {
+    document.getElementById('key-status').style.display = 'none';
+  }
+}
+
 // ─── SERVICE WORKER ────────────────────────────────────────────────────────
 if('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -670,6 +707,7 @@ if('serviceWorker' in navigator) {
 // ─── INIT ──────────────────────────────────────────────────────────────────
 updateMonthDisplays();
 loadRecords();
+showKeyStatus();
 </script>
 </body>
 </html>
